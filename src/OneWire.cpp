@@ -165,28 +165,30 @@ uint8_t OneWire::reset(void)
     pinModeFastInput();
     interrupts();
     // wait until the wire is high... just in case
-    do {
-        if (--retries == 0) return 0;
+    do
+    {
+        if (--retries == 0)
+            return 0;
 
         delayMicroseconds(2);
-    } while ( !digitalReadFast());
+    } while (!digitalReadFast());
 
     noInterrupts();
 
     digitalWriteFastLow();
-    pinModeFastOutput();   // drive output low
+    pinModeFastOutput(); // drive output low
 
     interrupts();
     delayMicroseconds(480);
-    noInterrupts();
 
-    pinModeFastInput();    // allow it to float
+    ATOMIC_BLOCK()
+    {
+        pinModeFastInput(); // allow it to float
 
-    delayMicroseconds(70);
+        delayMicroseconds(70);
 
-    r =! digitalReadFast();
-
-    interrupts();
+        r = !digitalReadFast();
+    }
 
     delayMicroseconds(410);
 
@@ -195,31 +197,31 @@ uint8_t OneWire::reset(void)
 
 void OneWire::write_bit(uint8_t v)
 {
-    if (v & 1) {
-        noInterrupts();
+    if (v & 1)
+    {
+        ATOMIC_BLOCK()
+        {
+            digitalWriteFastLow();
+            pinModeFastOutput(); // drive output low
 
-        digitalWriteFastLow();
-        pinModeFastOutput();   // drive output low
+            delayMicroseconds(1);
 
-        delayMicroseconds(10);
+            pinModeFastInput(); // float high
+        }
 
-        pinModeFastInput();    // float high
+        delayMicroseconds(59);
+    }
+    else
+    {
+        ATOMIC_BLOCK()
+        {
+            digitalWriteFastLow();
+            pinModeFastOutput(); // drive output low
 
-        interrupts();
+            delayMicroseconds(65);
 
-        delayMicroseconds(55);
-    } else {
-        noInterrupts();
-
-        digitalWriteFastLow();
-        pinModeFastOutput();   // drive output low
-
-        delayMicroseconds(65);
-
-        pinModeFastInput();    // float high
-
-        interrupts();
-
+            pinModeFastInput(); // float high
+        }
         delayMicroseconds(5);
     }
 }
@@ -232,21 +234,21 @@ uint8_t OneWire::read_bit(void)
 {
     uint8_t r;
 
-    noInterrupts();
+    ATOMIC_BLOCK()
+    {
+        digitalWriteFastLow();
+        pinModeFastOutput();
 
-    digitalWriteFastLow();
-    pinModeFastOutput();
+        delayMicroseconds(1);
 
-    delayMicroseconds(3);
+        pinModeFastInput(); // let pin float, pull up will raise
 
-    pinModeFastInput();    // let pin float, pull up will raise
+        delayMicroseconds(13);
 
-    delayMicroseconds(10);
+        r = digitalReadFast();
+    }
 
-    r = digitalReadFast();
-
-    interrupts();
-    delayMicroseconds(53);
+    delayMicroseconds(46);
 
     return r;
 }
@@ -258,34 +260,37 @@ uint8_t OneWire::read_bit(void)
 // go tri-state at the end of the write to avoid heating in a short or
 // other mishap.
 //
-void OneWire::write(uint8_t v, uint8_t power /* = 0 */) 
+void OneWire::write(uint8_t v, uint8_t power /* = 0 */)
 {
     uint8_t bitMask;
 
-    for (bitMask = 0x01; bitMask; bitMask <<= 1) {
-        OneWire::write_bit( (bitMask & v)?1:0);
+    for (bitMask = 0x01; bitMask; bitMask <<= 1)
+    {
+        OneWire::write_bit((bitMask & v) ? 1 : 0);
     }
 
-    if ( power) {
+    if (power)
+    {
         noInterrupts();
 
         digitalWriteFastHigh();
-        pinModeFastOutput();        // Drive pin High when power is True
+        pinModeFastOutput(); // Drive pin High when power is True
 
         interrupts();
     }
 }
 
-void OneWire::write_bytes(const uint8_t *buf, uint16_t count, bool power /* = 0 */) 
+void OneWire::write_bytes(const uint8_t *buf, uint16_t count, bool power /* = 0 */)
 {
-    for (uint16_t i = 0 ; i < count ; i++)
+    for (uint16_t i = 0; i < count; i++)
         write(buf[i]);
 
-    if (power) {
+    if (power)
+    {
         noInterrupts();
 
         digitalWriteFastHigh();
-        pinModeFastOutput();        // Drive pin High when power is True
+        pinModeFastOutput(); // Drive pin High when power is True
 
         interrupts();
     }
@@ -294,21 +299,23 @@ void OneWire::write_bytes(const uint8_t *buf, uint16_t count, bool power /* = 0 
 //
 // Read a byte
 //
-uint8_t OneWire::read() 
+uint8_t OneWire::read()
 {
     uint8_t bitMask;
     uint8_t r = 0;
 
-    for (bitMask = 0x01; bitMask; bitMask <<= 1) {
-        if ( OneWire::read_bit()) r |= bitMask;
+    for (bitMask = 0x01; bitMask; bitMask <<= 1)
+    {
+        if (OneWire::read_bit())
+            r |= bitMask;
     }
 
     return r;
 }
 
-void OneWire::read_bytes(uint8_t *buf, uint16_t count) 
+void OneWire::read_bytes(uint8_t *buf, uint16_t count)
 {
-    for (uint16_t i = 0 ; i < count ; i++)
+    for (uint16_t i = 0; i < count; i++)
         buf[i] = read();
 }
 
@@ -319,9 +326,10 @@ void OneWire::select(const uint8_t rom[8])
 {
     uint8_t i;
 
-    write(0x55);           // Choose ROM
+    write(0x55); // Choose ROM
 
-    for (i = 0; i < 8; i++) write(rom[i]);
+    for (i = 0; i < 8; i++)
+        write(rom[i]);
 }
 
 //
@@ -329,7 +337,7 @@ void OneWire::select(const uint8_t rom[8])
 //
 void OneWire::skip()
 {
-    write(0xCC);           // Skip ROM
+    write(0xCC); // Skip ROM
 }
 
 void OneWire::depower()
@@ -354,9 +362,11 @@ void OneWire::reset_search()
     LastDeviceFlag = FALSE;
     LastFamilyDiscrepancy = 0;
 
-    for(int i = 7; ; i--) {
+    for (int i = 7;; i--)
+    {
         ROM_NO[i] = 0;
-        if ( i == 0) break;
+        if (i == 0)
+            break;
     }
 }
 
@@ -365,16 +375,16 @@ void OneWire::reset_search()
 //
 void OneWire::target_search(uint8_t family_code)
 {
-   // set the search state to find SearchFamily type devices
+    // set the search state to find SearchFamily type devices
 
-   ROM_NO[0] = family_code;
+    ROM_NO[0] = family_code;
 
-   for (uint8_t i = 1; i < 8; i++)
-      ROM_NO[i] = 0;
+    for (uint8_t i = 1; i < 8; i++)
+        ROM_NO[i] = 0;
 
-   LastDiscrepancy = 64;
-   LastFamilyDiscrepancy = 0;
-   LastDeviceFlag = FALSE;
+    LastDiscrepancy = 64;
+    LastFamilyDiscrepancy = 0;
+    LastDeviceFlag = FALSE;
 }
 
 //
@@ -412,7 +422,8 @@ uint8_t OneWire::search(uint8_t *newAddr)
     if (!LastDeviceFlag)
     {
         // 1-Wire reset
-        if (!reset()){
+        if (!reset())
+        {
             // reset the search
             LastDiscrepancy = 0;
             LastDeviceFlag = FALSE;
@@ -432,16 +443,19 @@ uint8_t OneWire::search(uint8_t *newAddr)
             cmp_id_bit = read_bit();
 
             // check for no devices on 1-wire
-            if ((id_bit == 1) && (cmp_id_bit == 1)){
+            if ((id_bit == 1) && (cmp_id_bit == 1))
+            {
                 break;
             }
             else
             {
                 // all devices coupled have 0 or 1
-                if (id_bit != cmp_id_bit){
-                    search_direction = id_bit;  // bit write value for search
+                if (id_bit != cmp_id_bit)
+                {
+                    search_direction = id_bit; // bit write value for search
                 }
-                else{
+                else
+                {
                     // if this discrepancy if before the Last Discrepancy
                     // on a previous next then pick the same as last time
                     if (id_bit_number < LastDiscrepancy)
@@ -451,7 +465,8 @@ uint8_t OneWire::search(uint8_t *newAddr)
                         search_direction = (id_bit_number == LastDiscrepancy);
 
                     // if 0 was picked then record its position in LastZero
-                    if (search_direction == 0){
+                    if (search_direction == 0)
+                    {
                         last_zero = id_bit_number;
 
                         // check for Last discrepancy in family
@@ -463,9 +478,9 @@ uint8_t OneWire::search(uint8_t *newAddr)
                 // set or clear the bit in the ROM byte rom_byte_number
                 // with mask rom_byte_mask
                 if (search_direction == 1)
-                  ROM_NO[rom_byte_number] |= rom_byte_mask;
+                    ROM_NO[rom_byte_number] |= rom_byte_mask;
                 else
-                  ROM_NO[rom_byte_number] &= ~rom_byte_mask;
+                    ROM_NO[rom_byte_number] &= ~rom_byte_mask;
 
                 // serial number search direction write bit
                 write_bit(search_direction);
@@ -482,7 +497,7 @@ uint8_t OneWire::search(uint8_t *newAddr)
                     rom_byte_mask = 1;
                 }
             }
-        }while(rom_byte_number < 8);  // loop until through all ROM bytes 0-7
+        } while (rom_byte_number < 8); // loop until through all ROM bytes 0-7
 
         // if the search was successful then
         if (!(id_bit_number < 65))
@@ -499,14 +514,16 @@ uint8_t OneWire::search(uint8_t *newAddr)
     }
 
     // if no device found then reset counters so next 'search' will be like a first
-    if (!search_result || !ROM_NO[0]){
+    if (!search_result || !ROM_NO[0])
+    {
         LastDiscrepancy = 0;
         LastDeviceFlag = FALSE;
         LastFamilyDiscrepancy = 0;
         search_result = FALSE;
     }
 
-    for (int i = 0; i < 8; i++) newAddr[i] = ROM_NO[i];
+    for (int i = 0; i < 8; i++)
+        newAddr[i] = ROM_NO[i];
 
     return search_result;
 }
@@ -518,22 +535,24 @@ uint8_t OneWire::search(uint8_t *newAddr)
 // "Understanding and Using Cyclic Redundancy Checks with Maxim iButton Products"
 //
 
-
 //
 // Compute a Dallas Semiconductor 8 bit CRC directly.
 // this is much slower, but much smaller, than the lookup table.
 //
-uint8_t OneWire::crc8( uint8_t *addr, uint8_t len)
+uint8_t OneWire::crc8(uint8_t *addr, uint8_t len)
 {
     uint8_t crc = 0;
 
-    while (len--) {
+    while (len--)
+    {
         uint8_t inbyte = *addr++;
-        for (uint8_t i = 8; i; i--) {
+        for (uint8_t i = 8; i; i--)
+        {
             uint8_t mix = (crc ^ inbyte) & 0x01;
             crc >>= 1;
-            if (mix) crc ^= 0x8C;
-                inbyte >>= 1;
+            if (mix)
+                crc ^= 0x8C;
+            inbyte >>= 1;
         }
     }
 
@@ -542,19 +561,20 @@ uint8_t OneWire::crc8( uint8_t *addr, uint8_t len)
 #endif
 
 #if ONEWIRE_CRC16
-bool OneWire::check_crc16(const uint8_t* input, uint16_t len, const uint8_t* inverted_crc, uint16_t crc)
+bool OneWire::check_crc16(const uint8_t *input, uint16_t len, const uint8_t *inverted_crc, uint16_t crc)
 {
     crc = ~crc16(input, len, crc);
 
     return (crc & 0xFF) == inverted_crc[0] && (crc >> 8) == inverted_crc[1];
 }
 
-uint16_t OneWire::crc16(const uint8_t* input, uint16_t len, uint16_t crc)
+uint16_t OneWire::crc16(const uint8_t *input, uint16_t len, uint16_t crc)
 {
     static const uint8_t oddparity[16] =
-        { 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0 };
+        {0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0};
 
-    for (uint16_t i = 0 ; i < len ; i++) {
+    for (uint16_t i = 0; i < len; i++)
+    {
         // Even though we're just copying a byte from the input,
         // we'll be doing 16-bit computation with it.
         uint16_t cdata = input[i];
