@@ -4,6 +4,8 @@ The One Wire (1-Wire) protocol is used in the popular DS18B20 temperature sensor
 
 This library implements the Dallas One Wire (1-wire) protocol on the Particle Photon, Electron, Core, P0/P1, Red Bear Duo and compatible devices.
 
+**WARNING: This library has not been updated for the Argon, Boron, Tracker One, Photon 2/P2.** It won't work for these platforms until the `OneWrite` `pinModeFastInput/pinModeFastInput` functions are ported to these platforms.
+
 ## Usage
 
 If you are using a DS18B20, DS1820 or DS1822 temperature sensor, you can simply use the `DS18` object to read temperature.
